@@ -1,0 +1,26 @@
+# KAGE-MAN.DOJO :: dns/docker-compose.yml
+#
+# A CoreDNS resolver on the WAN segment that makes the WAN services look like
+# real internet-facing sites (see dns/dojo.hosts). Point an attacker box's
+# resolver at 10.0.8.53 to use it:
+#     echo 'nameserver 10.0.8.53' | sudo tee /etc/resolv.conf   # on Kali (WAN)
+#
+# Managed like any lab:  make up LAB=dns   |   make down LAB=dns
+version: '2.4'
+services:
+  dns:
+    image: coredns/coredns:1.11.1
+    restart: unless-stopped
+    container_name: kagemandojo-dns
+    command: ["-conf", "/etc/coredns/Corefile"]
+    volumes:
+      - ./Corefile:/etc/coredns/Corefile:ro
+      - ./dojo.hosts:/etc/coredns/dojo.hosts:ro
+    networks:
+      labseg:
+        ipv4_address: 10.0.8.53
+
+networks:
+  labseg:
+    external: true
+    name: KAGE-DOJO-WAN

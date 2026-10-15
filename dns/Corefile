@@ -1,0 +1,18 @@
+# KAGE-MAN.DOJO :: dns/Corefile  (CoreDNS)
+#
+# Authoritative for the fake-internet names in dojo.hosts; everything else is
+# forwarded upstream so the WAN behaves like the real internet (works when the
+# host VM has connectivity via the WAN NAT gateway 10.0.8.1; harmless offline).
+.:53 {
+    hosts /etc/coredns/dojo.hosts {
+        ttl 60
+        reload 5s
+        fallthrough          # names not in the file fall through to forward
+    }
+    forward . 8.8.8.8 1.1.1.1 {
+        max_fails 0          # keep serving local names even if upstream is down
+    }
+    cache 30
+    errors
+    log
+}

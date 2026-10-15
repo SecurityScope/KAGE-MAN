@@ -1,0 +1,15 @@
+# KAGE-MAN.DOJO :: dns/dojo.hosts
+#
+# Fake "internet" forward (and auto-reverse) records for the WAN segment, so the
+# WAN services look like real internet-facing sites. /etc/hosts format; CoreDNS
+# derives PTR records automatically. Edit freely, then: make up LAB=dns
+# (or `docker restart kagemandojo-dns` -- CoreDNS reloads this file live).
+#
+# ip            names (first = canonical, rest = aliases)
+10.0.8.20       mq.logistics-hub.io broker.logistics-hub.io
+10.0.8.21       www.shopizer-online.com shopizer-online.com
+10.0.8.22       api.fintrust-bank.com
+10.0.8.23       monitor.netops-isp.net
+10.0.8.24       www.city-gazette.org city-gazette.org
+10.0.8.25       mail.city-gazette.org smtp.city-gazette.org
+10.0.8.26       shell.devbox-hosting.net

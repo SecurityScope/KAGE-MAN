@@ -252,6 +252,30 @@ powershell -ExecutionPolicy Bypass -File scripts\vbox-networks.ps1 list      # (
 **Attacker:** attach a Kali VM to the **`KAGE-DOJO-WAN`** NAT network with a
 static `10.0.8.x` address and walk the campaign from the WAN inward.
 
+### WAN DNS — fake internet ([`dns/`](dns/))
+
+A CoreDNS resolver on the WAN (`10.0.8.53`) makes the seven WAN services look
+like real internet sites: it answers the names in
+[`dns/dojo.hosts`](dns/dojo.hosts) (e.g. `www.shopizer-online.com → 10.0.8.21`,
+with auto-generated reverse PTR) and forwards everything else upstream, so
+unknown names resolve on the real internet when the host VM is online.
+
+```bash
+make up LAB=dns          # or: make dns      (start the resolver)
+make down LAB=dns        # or: make dns-down
+```
+
+On the attacker box (also on the WAN), point DNS at it and browse by name:
+
+```bash
+echo 'nameserver 10.0.8.53' | sudo tee /etc/resolv.conf     # Kali, on the WAN
+curl http://www.shopizer-online.com/                        # -> struts2 @ 10.0.8.21
+```
+
+Edit `dns/dojo.hosts` to change the names — CoreDNS reloads it live (no
+restart). The resolver sits on the WAN macvlan, so it is reachable from other
+VMs on the segment, not from the Docker host itself (normal macvlan behaviour).
+
 **NIC note:** Vagrant owns adapter 1 as its management NAT, so the three lab
 NICs come up as `enp0s8/enp0s9/enp0s10`, not the `enp0s3/enp0s8/enp0s9` that
 `segments.conf` ships with. The Vagrantfile pins a fixed MAC on each segment

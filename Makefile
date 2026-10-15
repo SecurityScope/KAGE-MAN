@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help install-deps net networks gen build up down reset ps logs health healthcheck smoke
+.PHONY: help install-deps net networks gen build up down reset ps logs health healthcheck smoke dns dns-down
 
 # KAGE-MAN.DOJO — a self-contained Metasploit practice range.
 # All targets operate on this repository; no environment variables required.
@@ -22,6 +22,7 @@ help:
 	@echo "  make build|up|down      compose lifecycle (LAB=<filter> to narrow)"
 	@echo "  make reset              stop labs AND delete their volumes"
 	@echo "  make ps | make logs     running labs / recent logs"
+	@echo "  make dns | make dns-down WAN resolver (fake internet names, 10.0.8.53)"
 	@echo "  make health             container + network + mount healthcheck"
 	@echo "  make smoke              endpoint probes from inside the segments"
 	@echo
@@ -59,3 +60,9 @@ health healthcheck:
 
 smoke:
 	./scripts/smoke-test.sh $(LAB)
+
+dns:
+	./scripts/labs.sh up dns
+
+dns-down:
+	./scripts/labs.sh down dns
