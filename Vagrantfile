@@ -61,7 +61,26 @@ SEGMENTS = [
   { net: "KAGE-DOJO-WAN", mac: "0800271A8022" }, # adapter 4
 ]
 
-LOGO = File.expand_path("assets/images/logo.bmp", __dir__)
+GUI    = %w[1 true yes on].include?((ENV["KAGE_GUI"] || "").downcase)
+LOGO   = File.expand_path("assets/images/logo.bmp", __dir__)
+
+# The BIOS/firmware logo options were renamed in VirtualBox 7.1+
+# (--bioslogo* -> --firmware-logo-*). Detect which this host supports so the
+# logo works on both. NB: the logo only renders in the GUI console window
+# (KAGE_GUI=1); a headless VM never shows it.
+def logo_customizations(logo)
+  return [] unless File.exist?(logo)
+  help = begin; `VBoxManage help modifyvm 2>&1`; rescue StandardError; ""; end
+  img, time, fin, fout =
+    if help.include?("--firmware-logo-image-path")
+      ["--firmware-logo-image-path", "--firmware-logo-display-time",
+       "--firmware-logo-fade-in", "--firmware-logo-fade-out"]
+    else
+      ["--bioslogoimagepath", "--bioslogodisplaytime",
+       "--bioslogofadein", "--bioslogofadeout"]
+    end
+  [[img, logo], [time, "5000"], [fin, "off"], [fout, "off"]]
+end
 
 Vagrant.configure("2") do |config|
   config.vm.box          = BOX
@@ -96,6 +115,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.provider "virtualbox" do |vb|
     vb.name   = "KAGE-MAN.DOJO"
+    vb.gui    = GUI            # KAGE_GUI=1 opens the VM window (needed to see the logo)
     vb.cpus   = CPUS
     vb.memory = MEMORY
     vb.customize ["modifyvm", :id, "--ioapic", "on"]
@@ -114,11 +134,10 @@ Vagrant.configure("2") do |config|
 
     # Boot splash = the dojo logo (VirtualBox BIOS logo; must be an
     # uncompressed BMP <= 640x480, which assets/images/logo.bmp already is).
-    if File.exist?(LOGO)
-      vb.customize ["modifyvm", :id, "--bioslogoimagepath",   LOGO]
-      vb.customize ["modifyvm", :id, "--bioslogodisplaytime", "5000"]
-      vb.customize ["modifyvm", :id, "--bioslogofadein",      "off"]
-      vb.customize ["modifyvm", :id, "--bioslogofadeout",     "off"]
+    # Boot splash = the dojo logo (visible only with KAGE_GUI=1). Flag names
+    # differ across VirtualBox versions; logo_customizations picks the right set.
+    logo_customizations(LOGO).each do |flag, value|
+      vb.customize ["modifyvm", :id, flag, value]
     end
   end
 

@@ -210,9 +210,21 @@ KAGE_MEMORY=12288 KAGE_CPUS=6 vagrant up   # bigger box (defaults: 8192 MB / 4 v
 
 Other knobs: `KAGE_BOX`, `KAGE_DISK` (needs `vagrant plugin install
 vagrant-disksize`). See the header comments in [`Vagrantfile`](Vagrantfile).
-The VM is named **`KAGE-MAN.DOJO`** in VirtualBox and boots with the dojo logo
-([`assets/images/logo.bmp`](assets/images/logo.bmp), a BMP derived from
-`logo.png`) as its BIOS splash.
+The VM is named **`KAGE-MAN.DOJO`** in VirtualBox. Log in at the console as
+**`vagrant` / `vagrant`** (passwordless `sudo`); `vagrant ssh` uses the
+generated key and needs no password.
+
+By default the VM runs **headless** (no window). To open the VirtualBox console
+window — and see the dojo logo
+([`assets/images/logo.bmp`](assets/images/logo.bmp), derived from `logo.png`)
+as the firmware boot splash — start it with a GUI:
+
+```bash
+KAGE_GUI=1 vagrant up        # or: vagrant reload, if already running
+```
+
+The logo shows only in the GUI window during early boot; a headless VM never
+displays it.
 
 ### VirtualBox networks
 
