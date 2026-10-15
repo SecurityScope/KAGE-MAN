@@ -1,0 +1,48 @@
+# KAGE-MAN.DOJO :: labs.manifest — the range as configuration
+#
+# One continuous campaign from the WAN: white-belt modules -> brown-belt
+# configure/chaining/auxiliary -> black-belt manual exploitation + full MSF
+# workflow -> a pivot masterclass -> the persistence capstone (msfvenom
+# payloads that survive a restart and a real reboot).
+#
+# columns: lab_path                 ip             seg       [frontend] [pport] [extra-homes]
+#   extra-homes dual-homes a container onto a second segment (the pivot seams).
+
+# ================= WAN — the internet edge =================
+# Seven exposed services; only activemq is dual-homed (the single door into
+# the DMZ). The rest are attack-surface warm-ups that lead nowhere deeper.
+vulhub/activemq/CVE-2023-46604       10.0.8.20      wan       activemq   61616   dmz:192.168.80.20
+vulhub/struts2/s2-045                10.0.8.21      wan       struts2    8080
+vulhub/spring/CVE-2022-22965         10.0.8.22      wan       spring     8080
+vulhub/cacti/CVE-2022-46169          10.0.8.23      wan       web        80
+vulhub/joomla/CVE-2015-8562          10.0.8.24      wan       web        80
+vulhub/opensmtpd/CVE-2020-7247       10.0.8.25      wan       smtpd      25
+vulhub/erlang/CVE-2025-32433         10.0.8.26      wan       sshd       2222
+
+# ================= DMZ — reachable only through the WAN door =================
+# white belt — reflex set A: data stores & servers
+vulhub/couchdb/CVE-2017-12635        192.168.80.21  dmz       couchdb    5984
+vulhub/redis/4-unacc                 192.168.80.22  dmz       redis      6379
+vulhub/httpd/CVE-2021-41773          192.168.80.25  dmz       apache     80
+vulhub/samba/CVE-2017-7494           192.168.80.26  dmz       samba      445
+# white belt — reflex set B: apps & admin panels
+vulhub/drupal/CVE-2018-7600          192.168.80.27  dmz       web        80
+vulhub/webmin/CVE-2019-15107         192.168.80.28  dmz       web        10000
+vulhub/thinkphp/5-rce                192.168.80.29  dmz       web        80
+# brown belt — configure, chain & auxiliary-driven
+vulhub/tomcat/tomcat8                192.168.80.23  dmz       tomcat     8080    internal:172.16.80.20
+vulhub/php/8.1-backdoor              192.168.80.24  dmz       web        80
+vulhub/libssh/CVE-2018-10933         192.168.80.30  dmz       sshd       22
+vulhub/supervisor/CVE-2017-11610     192.168.80.31  dmz       web        9001
+
+# ================= INTERNAL — reachable only through the seam =================
+# brown belt — internal services behind the second pivot
+vulhub/mysql/CVE-2012-2122           172.16.80.45   internal  mysql      3306
+# black belt — manual exploitation + full MSF workflow
+vulhub/uwsgi/unacc                   172.16.80.46   internal  web        8000
+vulhub/python/unpickle               172.16.80.41   internal  flask      8000
+vulhub/flask/ssti                    172.16.80.42   internal  web        8000
+vulhub/fastjson/1.2.24-rce           172.16.80.47   internal  web        8090
+vulhub/minio/CVE-2023-28432          172.16.80.48   internal  node1      9000
+vulhub/postgres/CVE-2019-9193        172.16.80.44   internal  postgres   5432
+vulhub/polkit/CVE-2021-4034          172.16.80.43   internal  cmd        2222
