@@ -11,12 +11,10 @@
 #   2. map each segment to its NIC by the fixed MAC the Vagrantfile set, give
 #      it the .250 static address via netplan, and rewrite segments.conf's
 #      iface column to the real kernel name
-#   3. install-deps  -> Docker CE + seccomp + compose + make
+#   3. run setup.py (banner + progress bar): install-deps -> network-setup ->
+#      gen-labs -> build AND start every lab. KAGE_START picks the final stage
+#      (up=start all [default], build=build only, none=deps/net/gen only).
 #   4. put the vagrant user in the docker group
-#   5. network-setup -> promiscuous mode + the three macvlan segments
-#      (the NICs are already addressed, so no re-addressing happens)
-#   6. gen-labs      -> (re)generate every lab compose into the local copy
-#   7. optional: build / up all labs (KAGE_START)
 #
 set -euo pipefail
 
@@ -114,45 +112,27 @@ ok "segment NIC mapping:"
 grep -vE '^[[:space:]]*(#|$)' segments.conf | awk '{printf "    %-9s %-10s %s\n", $1, $2, $6}'
 
 # ---------------------------------------------------------------------------
-# 3. dependencies
+# 3-6. install deps, configure networking, generate composes, then build and
+#      start every lab -- all driven by the setup.py wrapper (banner + live
+#      progress bar). KAGE_START selects the final stage:
+#        up    (default) -> build AND start ALL labs (restart=unless-stopped)
+#        build           -> build all images, do not start
+#        none            -> deps/net/gen only
 # ---------------------------------------------------------------------------
-log "installing range dependencies (docker + seccomp + compose + make)"
-./scripts/install-deps.sh
+case "$START" in
+  up)      SETUP_ARGS=() ;;
+  build)   SETUP_ARGS=(--no-start) ;;
+  none|"") SETUP_ARGS=(--skip-build) ;;
+  *) warn "unknown KAGE_START='$START' (expected none|build|up); not starting labs"
+     SETUP_ARGS=(--skip-build) ;;
+esac
+log "running setup.py ${SETUP_ARGS[*]:-(full install + build + start all)}"
+python3 setup.py "${SETUP_ARGS[@]}"
 
-# ---------------------------------------------------------------------------
-# 4. let the vagrant user drive docker without sudo
-# ---------------------------------------------------------------------------
+# let the vagrant user drive docker without sudo
 if id vagrant >/dev/null 2>&1 && ! id -nG vagrant | grep -qw docker; then
   usermod -aG docker vagrant && ok "added vagrant to the docker group"
 fi
-
-# ---------------------------------------------------------------------------
-# 5. host networking: promisc + macvlan segments
-# ---------------------------------------------------------------------------
-log "building macvlan segments + promiscuous mode"
-./scripts/network-setup.sh
-
-# ---------------------------------------------------------------------------
-# 6. generate lab composes into the local copy
-# ---------------------------------------------------------------------------
-log "generating lab compose files"
-./scripts/gen-labs.sh
-
-# ---------------------------------------------------------------------------
-# 7. optional build / start
-# ---------------------------------------------------------------------------
-case "$START" in
-  build)
-    log "KAGE_START=build -> building/pulling ALL lab images (this is slow)"
-    ./scripts/labs.sh build || warn "some images failed to build (see above)"
-    ;;
-  up)
-    log "KAGE_START=up -> building AND starting ALL 26 labs (RAM/disk heavy)"
-    ./scripts/labs.sh up || warn "some labs failed to start (see above)"
-    ;;
-  none|"") : ;;
-  *) warn "unknown KAGE_START='$START' (expected none|build|up); skipping start" ;;
-esac
 
 # ---------------------------------------------------------------------------
 # done
@@ -165,14 +145,13 @@ $(ok 'KAGE-MAN.DOJO range host is provisioned.')
   Segments:           WAN 10.0.8.0/24 · DMZ 192.168.80.0/24 · INTERNAL 172.16.80.0/24
   Host addresses:     .250 on each segment
 
-  Next (inside the VM):
-    vagrant ssh
-    cd $LAB_DIR
-    make up LAB=activemq      # start one lab (a lesson at a time)
-    make up                   # start everything (needs lots of RAM)
+  Inside the VM (sudo docker ps to see what is running):
+    vagrant ssh ; cd $LAB_DIR
+    sudo python3 setup.py        # re-run the full install + build + start
     make ps | make health | make smoke
+    make down LAB=<name>         # stop a lab   |   make up LAB=<name> to start
 
   Attacker: attach a Kali VM to the KAGE-DOJO-WAN NAT network with a static
-            10.0.8.x address.
+            10.0.8.x address (DNS: 10.0.8.53).
 
 BANNER

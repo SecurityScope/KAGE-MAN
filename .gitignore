@@ -1,3 +1,10 @@
 # Vagrant
 .vagrant/
 *.log
+
+# Python
+__pycache__/
+*.pyc
+
+# scratch
+temp/

@@ -7,6 +7,11 @@
 *A self-contained Metasploit practice range — three segments, **26 vulnerable
 labs**, one continuous campaign.*
 
+<p align="center">
+  <b>English</b> · <a href="README_AR.md">العربية</a>
+  &nbsp;|&nbsp; Install guide: <a href="INSTALL.md">INSTALL.md</a> · <a href="INSTALL_AR.md">INSTALL_AR.md (عربي)</a>
+</p>
+
 `KAGE-MAN.DOJO` is a complete, offline-capable training range for the
 Metasploit Framework. A single Ubuntu VM hosts three macvlan segments — a WAN
 "internet edge", a DMZ and an INTERNAL network — populated with 26 curated
@@ -146,9 +151,7 @@ port on the segment (there are no host port mappings).
 | 26 | `polkit/CVE-2021-4034` | `172.16.80.43` | 2222 (ssh) | black | SSH in (`ubuntu`/`vulhub`) → `exploit/linux/local/cve_2021_4034_pwnkit_lpe_pkexec`; **the persistence host** (real Ubuntu VM inside) |
 
 Per-lab credentials and target notes live in each vendored lab README at
-`vulhub/<app>/<cve>/README.md`. The five-form campaign over these labs — every
-command, in order, ending with the persistence exam — is in
-[`SYLLABUS.md`](SYLLABUS.md).
+`vulhub/<app>/<cve>/README.md`.
 
 ## Student access
 
@@ -164,8 +167,11 @@ command, in order, ending with the persistence exam — is in
 
 ```text
 .
-├── Makefile                  # every operation below as a make target
-├── README.md  SYLLABUS.md    # this file + the five-form campaign
+├── install.sh  install.ps1   # one-command host build (Linux/macOS · Windows)
+├── Vagrantfile               # the Ubuntu VM: NAT networks, NICs, logo, provisioner
+├── setup.py                  # in-VM install/build wrapper (banner + progress bar)
+├── Makefile                  # every in-VM operation as a make target
+├── README.md  INSTALL.md     # docs  (Arabic: README_AR.md · INSTALL_AR.md)
 ├── labs.manifest             # the range as configuration (lab, IP, segment, options)
 ├── segments.conf             # the three macvlan segments + host NICs/IPs
 ├── smoke.tests               # generated endpoint list (make smoke)
@@ -176,7 +182,11 @@ command, in order, ending with the persistence exam — is in
 │   ├── healthcheck.sh        # containers, IPs, networks, mounts
 │   ├── smoke-test.sh         # endpoint probes from inside each segment
 │   ├── install-deps.sh       # docker + seccomp + compose + make
+│   ├── vagrant-provision.sh  # in-VM provisioner (run by `vagrant up`)
+│   ├── vbox-networks.sh/.ps1 # create the VirtualBox NAT networks (host side)
 │   └── seccomp-lab.json      # daemon seccomp profile (clone3 / faccessat2 / rseq)
+├── dns/                      # CoreDNS resolver for the WAN (fake internet)
+├── assets/                   # logo image + ANSI banner art
 ├── vulhub/                   # vendored lab sources (26 labs; do not edit)
 └── <app>__<cve>/docker-compose.yml   # generated, committed, relative paths
 ```
@@ -188,23 +198,39 @@ Edit `labs.manifest` (or `segments.conf`) and run `make gen` to re-emit them.
 ## One-command build with Vagrant
 
 The whole range host builds itself from a stock Ubuntu 20.04 box. From a
-machine with **VirtualBox + Vagrant**:
+machine with **VirtualBox + Vagrant**, one command does everything:
 
 ```bash
-vagrant up        # boots ubuntu/focal64, installs Docker, builds the three
-                  # macvlan segments, generates every lab compose — READY
-vagrant ssh
+./install.sh            # checks host deps, then `vagrant up`: creates the NAT
+                        # networks, boots the VM, installs Docker, builds the
+                        # macvlan segments, and builds + starts ALL labs + DNS
+vagrant ssh             # then, inside the VM:
 cd /opt/kage-man
-make up LAB=activemq     # start a lesson at a time (see batching below)
+make ps                 # see what's running   (make down LAB=<name> to stop)
 ```
 
-`vagrant up` provisions the host but leaves the 26 labs **stopped** (bringing
-them all up at once is RAM/disk heavy). To also start or pre-pull them, set
+On **Windows** use the PowerShell wrapper instead:
+
+```powershell
+.\install.ps1                 # or: powershell -ExecutionPolicy Bypass -File .\install.ps1
+.\install.ps1 -NoStart        # -Gui | -Provision | -Destroy
+```
+
+`install.sh` / `install.ps1` are thin host-side wrappers around `vagrant up`
+(so plain `vagrant up` works too). Flags: `--no-start`/`-NoStart` (provision
+only), `--gui`/`-Gui` (open the console window), `--provision`/`-Provision`
+(re-run on an existing VM), `--destroy`/`-Destroy`. Tunables pass through as
+env vars, e.g. `KAGE_MEMORY=12288 ./install.sh` (bash) or
+`$env:KAGE_MEMORY=12288; .\install.ps1` (PowerShell).
+
+By default `vagrant up` (and `./install.sh`) **builds and starts every lab**
+plus the WAN DNS, each with `restart=unless-stopped` so they survive a reboot.
+That needs plenty of RAM/disk, so size the VM accordingly — or do less with
 `KAGE_START`:
 
 ```bash
-KAGE_START=build vagrant up          # pre-build/pull all images (offline-ready)
-KAGE_START=up    vagrant up          # build AND start all 26 labs
+KAGE_START=none  vagrant up          # provision only — don't build or start labs
+KAGE_START=build vagrant up          # build/pull every image, but don't start them
 KAGE_MEMORY=12288 KAGE_CPUS=6 vagrant up   # bigger box (defaults: 8192 MB / 4 vCPU)
 ```
 
@@ -305,10 +331,12 @@ Raw scripts work the same way, e.g. `./scripts/labs.sh up struts2` or
 
 ### Module batching (important on this host)
 
-The `polkit` lab runs a **full Ubuntu 20.04 VM inside the container** (QEMU;
-~2 GB RAM, cloud-init boot in the order of ~10 minutes), the `minio` lab runs
-**three nodes**, and several labs are JVM-heavy. **Do not bring up all 26 labs
-at once.** Start only the lab(s) for the current lesson:
+The one-command Vagrant / `install.sh` build starts **everything** at once, so
+give the VM enough RAM (`KAGE_MEMORY`) or provision with `KAGE_START=none` and
+drive the range by hand. The `polkit` lab runs a **full Ubuntu 20.04 VM inside
+the container** (QEMU; ~2 GB RAM, cloud-init boot in the order of ~10 minutes),
+the `minio` lab runs **three nodes**, and several labs are JVM-heavy. On a small
+host, **don't bring up all 26 at once** — start only the lab(s) for the lesson:
 
 ```bash
 ./scripts/labs.sh up activemq struts2 spring cacti joomla opensmtpd erlang   # WAN lessons
@@ -336,8 +364,7 @@ at once.** Start only the lab(s) for the current lesson:
   `docker restart <container>` keeps everything written to the container
   filesystem; `labs.sh down` + `up` **recreates** the container (files lost);
   `labs.sh reset` also wipes named volumes. Persistence taught here is about
-  surviving a *reboot of the service/host*, and the syllabus documents exactly
-  which cleanup action removes each artifact.
+  surviving a *reboot of the service/host*.
 
 ## Safety notes
 
@@ -349,6 +376,5 @@ at once.** Start only the lab(s) for the current lesson:
 - Local privilege escalation (PwnKit) **lands root inside its VM** — that is
   the intended outcome; treat a rooted lab as spent for the session.
 - The persistence forms deliberately leave artifacts (accounts, keys, units,
-  cron files, web shells). `SYLLABUS.md` ends with a cleanup checklist, and
-  `make reset` returns any lab to a clean state.
+  cron files, web shells); `make reset` returns any lab to a clean state.
 - Keep the range on an isolated VirtualBox NAT network only.

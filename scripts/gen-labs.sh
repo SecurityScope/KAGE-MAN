@@ -244,6 +244,11 @@ for r in rows:
     top_vols = set()
     for name, s in services.items():
         s = dict(s or {})
+        # One-shot init/setup containers (run a command, depend on another
+        # service, expose no ports) must NOT get restart:unless-stopped, or they
+        # exit 0 and loop forever. Detect before we strip ports below.
+        one_shot = (name != frontend and "command" in s
+                    and "depends_on" in s and "ports" not in s)
         s.pop("ports", None)
         s.pop("network_mode", None)
         s.pop("networks", None)
@@ -251,7 +256,7 @@ for r in rows:
         fix_volumes(s, labdir, destdir)
         fix_build(s, labdir, destdir)
         fix_env_file(s, labdir, destdir)
-        s["restart"] = "unless-stopped"
+        s["restart"] = "no" if one_shot else "unless-stopped"
         s["container_name"] = re.sub(r'-+', '-', "%s-%s-%s" % (PREFIX, slug, name))[:60]
         if name == frontend:
             nets = {}
