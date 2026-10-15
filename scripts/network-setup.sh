@@ -110,6 +110,11 @@ EOF
 if (( DRY_RUN )); then
   cat "$tmp"
 else
+  # netplan-only hosts (e.g. a stock Ubuntu cloud/Vagrant box) have no
+  # /etc/network/interfaces.d; create it so the fragment install succeeds.
+  # It is harmless there (ifupdown never reads it) -- actual addressing is
+  # done elsewhere (netplan) and this script never re-addresses a live NIC.
+  mkdir -p "$(dirname "$IFACES_FILE")"
   install -m 0644 "$tmp" "$IFACES_FILE"
 fi
 rm -f "$tmp"

@@ -185,9 +185,74 @@ The generated composes reference the vendored sources with **relative paths**
 (`../vulhub/...`), so the checkout is portable and works without regenerating.
 Edit `labs.manifest` (or `segments.conf`) and run `make gen` to re-emit them.
 
+## One-command build with Vagrant
+
+The whole range host builds itself from a stock Ubuntu 20.04 box. From a
+machine with **VirtualBox + Vagrant**:
+
+```bash
+vagrant up        # boots ubuntu/focal64, installs Docker, builds the three
+                  # macvlan segments, generates every lab compose — READY
+vagrant ssh
+cd /opt/kage-man
+make up LAB=activemq     # start a lesson at a time (see batching below)
+```
+
+`vagrant up` provisions the host but leaves the 26 labs **stopped** (bringing
+them all up at once is RAM/disk heavy). To also start or pre-pull them, set
+`KAGE_START`:
+
+```bash
+KAGE_START=build vagrant up          # pre-build/pull all images (offline-ready)
+KAGE_START=up    vagrant up          # build AND start all 26 labs
+KAGE_MEMORY=12288 KAGE_CPUS=6 vagrant up   # bigger box (defaults: 8192 MB / 4 vCPU)
+```
+
+Other knobs: `KAGE_BOX`, `KAGE_DISK` (needs `vagrant plugin install
+vagrant-disksize`). See the header comments in [`Vagrantfile`](Vagrantfile).
+The VM is named **`KAGE-MAN.DOJO`** in VirtualBox and boots with the dojo logo
+([`assets/images/logo.bmp`](assets/images/logo.bmp), a BMP derived from
+`logo.png`) as its BIOS splash.
+
+### VirtualBox networks
+
+The three segments are **named VirtualBox NAT networks** (L2 + outbound NAT at
+`.1`), created with `VBoxManage` from `segments.conf`:
+
+| NAT network | Subnet | Host VM | Adapter |
+|---|---|---|---|
+| `KAGE-DOJO-DMZ` | `192.168.80.0/24` | `.250` | 2 |
+| `KAGE-DOJO-INT` | `172.16.80.0/24` | `.250` | 3 |
+| `KAGE-DOJO-WAN` | `10.0.8.0/24` | `.250` | 4 |
+
+`vagrant up` creates them automatically (a `before :up` trigger), but you can
+run the creator yourself — it works identically on Linux/macOS and Windows:
+
+```bash
+./scripts/vbox-networks.sh create            # Linux / macOS
+./scripts/vbox-networks.sh list | remove
+```
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\vbox-networks.ps1 create   # Windows
+powershell -ExecutionPolicy Bypass -File scripts\vbox-networks.ps1 list      # (or: remove)
+```
+
+**Attacker:** attach a Kali VM to the **`KAGE-DOJO-WAN`** NAT network with a
+static `10.0.8.x` address and walk the campaign from the WAN inward.
+
+**NIC note:** Vagrant owns adapter 1 as its management NAT, so the three lab
+NICs come up as `enp0s8/enp0s9/enp0s10`, not the `enp0s3/enp0s8/enp0s9` that
+`segments.conf` ships with. The Vagrantfile pins a fixed MAC on each segment
+NIC, and the provisioner
+([`scripts/vagrant-provision.sh`](scripts/vagrant-provision.sh)) uses those
+MACs to assign the `.250` addresses and rewrite the iface column — so the
+opaque NIC ordering never matters.
+
 ## Tooling quick start
 
-Run everything from the repository root — no environment variables required:
+Prefer this path when you are **already on an Ubuntu host** (bare metal, or a VM
+you built yourself). Run everything from the repository root — no environment
+variables required:
 
 ```bash
 sudo make install-deps                    # once per host: docker + seccomp + compose + make
